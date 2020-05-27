@@ -9,14 +9,47 @@ function reducer(state, action) {
       timestamp: Date.now(),
       id: uuid.v4(),
     };
+    const threadIndex = state.threads.findIndex(
+      (t) => t.id === action.threadId
+    );
+    const oldThread = state.threads[threadIndex];
+    const newThread = {
+      ...oldThread,
+      messages: oldThread.messages.concat(newMessage),
+    };
+    
     return {
-      messages: state.messages.concat(newMessage),
+      ...state,
+      threads: [
+        ...state.threads.slice(0, threadIndex),
+        newThread,
+        ...state.threads.slice(
+          threadIndex + 1, state.threads.length
+        ),
+      ],
     };
   } else if (action.type === 'DELETE_MESSAGE') {
-    return {
-      messages: state.messages.filter((m) => (
+    const threadIndex = state.threads.findIndex(
+      (t) => t.messages.find((m) => (
+        m.id === action.id
+      ))
+    )
+    const oldThread = state.threads[threadIndex]
+    const newThread = {
+      ...oldThread,
+      messages: oldThread.messages.filter((m) => (
         m.id !== action.id
       ))
+    }
+    return {
+      ...state,
+      threads: [
+        ...state.threads.slice(0, threadIndex),
+        newThread,
+        ...state.threads.slice(
+          threadIndex + 1, state.threads.length
+        )
+      ]
     }
   } else {
     return state;
@@ -45,6 +78,7 @@ const initialState = {
   ],
 };
 
+
 const store = createStore(reducer, initialState);
 
 class App extends React.Component {
@@ -57,12 +91,37 @@ class App extends React.Component {
     const activeThreadId = state.activeThreadId
     const threads = state.threads
     const activeThread = threads.find((t) => t.id === activeThreadId)
-
+    const tabs = threads.map(t => (
+      {
+        title: t.title,
+        active: t.id === activeThreadId
+      }
+    ))
+    
     return (
       <div className='ui segment'>
+        <ThreadTabs tabs={tabs} />
         <Thread thread={activeThread} />
       </div>
     );
+  }
+}
+
+class ThreadTabs extends React.Component {
+  render() {
+    const tabs = this.props.tabs.map((tab, index) => (
+      <div
+        key={index}
+        className={tab.active ? 'active item' : 'item'}
+        >
+          {tab.title}
+        </div>
+    ))
+    return(
+      <div className='ui top attached tabular menu'>
+        {tabs}
+      </div>
+    )
   }
 }
 
@@ -81,6 +140,7 @@ class MessageInput extends React.Component {
     store.dispatch({
       type: 'ADD_MESSAGE',
       text: this.state.value,
+      threadId: this.props.threadId,
     });
     this.setState({
       value: '',
@@ -133,7 +193,7 @@ class Thread extends React.Component {
         <div className='ui comments'>
           {messages}
         </div>
-        <MessageInput/>
+        <MessageInput threadId={this.props.thread.id} />
       </div>
     );
   }
